@@ -70,7 +70,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Size submenu (applies to all characters)
         let sizeItem = NSMenuItem(title: "Size", action: nil, keyEquivalent: "")
         let sizeMenu = NSMenu()
-        let currentSize = controller?.characters.first?.size ?? .big
+        let currentSize = controller?.characters.first?.size ?? .large
         for (i, size) in CharacterSize.allCases.enumerated() {
             let item = NSMenuItem(title: size.displayName, action: #selector(switchCharacterSize(_:)), keyEquivalent: "")
             item.tag = i

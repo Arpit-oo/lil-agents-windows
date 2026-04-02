@@ -2,17 +2,17 @@ import AVFoundation
 import AppKit
 
 enum CharacterSize: String, CaseIterable {
-    case big, medium, small
+    case large, medium, small
     var height: CGFloat {
         switch self {
-        case .big: return 200
+        case .large: return 200
         case .medium: return 150
         case .small: return 100
         }
     }
     var displayName: String {
         switch self {
-        case .big: return "Big"
+        case .large: return "Large"
         case .medium: return "Medium"
         case .small: return "Small"
         }
@@ -34,7 +34,7 @@ class WalkerCharacter {
     var size: CharacterSize {
         get {
             let raw = UserDefaults.standard.string(forKey: "\(name)Size") ?? "big"
-            return CharacterSize(rawValue: raw) ?? .big
+            return CharacterSize(rawValue: raw) ?? .large
         }
         set {
             UserDefaults.standard.set(newValue.rawValue, forKey: "\(name)Size")
