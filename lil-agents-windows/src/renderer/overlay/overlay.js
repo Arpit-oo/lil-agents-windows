@@ -5,14 +5,8 @@ let characterStates = [];
 let sprites = new Map();
 let isDarkTheme = false;
 
-const THINKING_PHRASES = [
-  'hmm...', 'thinking...', 'one sec...', 'ok hold on', 'let me check',
-  'working on it', 'on it...', 'processing...', 'give me a moment',
-  'let me see...', 'checking...', 'analyzing...', 'figuring it out',
-  'looking into it', 'almost...', 'bear with me', 'just a sec',
-  'running that...', 'computing...', 'crunching...', 'diving in',
-  'exploring...', 'searching...', 'reading...', 'cooking...',
-];
+// Per-character animation state (renderer-side, decoupled from main process)
+let localAnimState = new Map();
 
 const COMPLETION_PHRASES = [
   'done!', 'all set!', 'ready!', 'here you go', 'got it!',
@@ -28,22 +22,52 @@ function resizeCanvas() {
 
 function drawCharacter(state) {
   const sprite = sprites.get(state.name);
-  const bottomY = canvas.height / window.devicePixelRatio - 10;
+  const canvasH = canvas.height / window.devicePixelRatio;
+  const bottomY = canvasH - 10;
+
+  // Get or create local animation state
+  let anim = localAnimState.get(state.name);
+  if (!anim) {
+    anim = { frameAccum: 0, currentFrame: 0, lastTime: performance.now() };
+    localAnimState.set(state.name, anim);
+  }
+
+  // Advance sprite frame smoothly at 30fps while walking
+  const now = performance.now();
+  const elapsed = now - anim.lastTime;
+  anim.lastTime = now;
+
+  if (state.isWalking) {
+    anim.frameAccum += elapsed;
+    const msPerFrame = 1000 / 30; // 30fps sprite playback
+    while (anim.frameAccum >= msPerFrame) {
+      anim.frameAccum -= msPerFrame;
+      anim.currentFrame++;
+    }
+  } else {
+    // Reset to standing frame when not walking
+    anim.currentFrame = 0;
+    anim.frameAccum = 0;
+  }
 
   if (!sprite || !sprite.loaded || sprite.images.length === 0) {
     // Placeholder colored rectangle
     ctx.fillStyle = state.name === 'bruce' ? '#66B88C' : '#FF6600';
-    ctx.fillRect(state.x - state.width / 2, bottomY - state.height, state.width, state.height);
+    const rectW = state.width || 113;
+    const rectH = state.height || 200;
+    ctx.fillRect(state.x - rectW / 2, bottomY - rectH, rectW, rectH);
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 14px "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(state.name.charAt(0).toUpperCase() + state.name.slice(1), state.x, bottomY - state.height / 2);
+    ctx.fillText(state.name.charAt(0).toUpperCase() + state.name.slice(1), state.x, bottomY - rectH / 2);
     return;
   }
 
-  const frameIndex = Math.min(state.frame, sprite.images.length - 1);
+  const frameIndex = anim.currentFrame % sprite.images.length;
   const img = sprite.images[frameIndex];
+  if (!img || !img.complete || img.naturalWidth === 0) return; // Skip unloaded frames
+
   const yPos = bottomY - state.height;
 
   ctx.save();
@@ -60,7 +84,8 @@ function drawCharacter(state) {
 function drawBubble(state) {
   if (!state.bubbleText) return;
 
-  const bottomY = canvas.height / window.devicePixelRatio - 10;
+  const canvasH = canvas.height / window.devicePixelRatio;
+  const bottomY = canvasH - 10;
   const bubbleX = state.x;
   const bubbleY = bottomY - state.height - 35;
   const text = state.bubbleText;
@@ -73,12 +98,10 @@ function drawBubble(state) {
 
   const isCompletion = COMPLETION_PHRASES.includes(text);
 
-  // Background
   ctx.fillStyle = isDarkTheme ? '#1a1a1a' : '#ffffff';
   ctx.strokeStyle = isCompletion ? '#4CAF50' : (isDarkTheme ? '#444' : '#ddd');
   ctx.lineWidth = 1.5;
 
-  // Rounded rect
   const rx = bubbleX - bubbleWidth / 2;
   const ry = bubbleY - bubbleHeight / 2;
   const r = 8;
@@ -96,7 +119,6 @@ function drawBubble(state) {
   ctx.fill();
   ctx.stroke();
 
-  // Triangle
   ctx.fillStyle = isDarkTheme ? '#1a1a1a' : '#ffffff';
   ctx.beginPath();
   ctx.moveTo(bubbleX - 6, ry + bubbleHeight);
@@ -105,7 +127,6 @@ function drawBubble(state) {
   ctx.closePath();
   ctx.fill();
 
-  // Text
   ctx.fillStyle = isCompletion ? '#4CAF50' : (isDarkTheme ? '#e0e0e0' : '#333');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -124,9 +145,11 @@ function render() {
 
 // Click detection: center 60% of character bounds
 canvas.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // Left click only
   for (const state of characterStates) {
     if (!state.visible) continue;
-    const bottomY = canvas.height / window.devicePixelRatio - 10;
+    const canvasH = canvas.height / window.devicePixelRatio;
+    const bottomY = canvasH - 10;
     const charLeft = state.x - state.width / 2;
     const charTop = bottomY - state.height;
     const zoneWidth = state.width * 0.6;
@@ -142,16 +165,39 @@ canvas.addEventListener('mousedown', (e) => {
   }
 });
 
+// Right-click: context menu
+canvas.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+  for (const state of characterStates) {
+    if (!state.visible) continue;
+    const canvasH = canvas.height / window.devicePixelRatio;
+    const bottomY = canvasH - 10;
+    const charLeft = state.x - state.width / 2;
+    const charTop = bottomY - state.height;
+    const zoneWidth = state.width * 0.7;
+    const zoneHeight = state.height * 0.7;
+    const zoneLeft = charLeft + (state.width - zoneWidth) / 2;
+    const zoneTop = charTop + (state.height - zoneHeight) / 2;
+
+    if (e.clientX >= zoneLeft && e.clientX <= zoneLeft + zoneWidth &&
+        e.clientY >= zoneTop && e.clientY <= zoneTop + zoneHeight) {
+      window.lilAgents.characterRightClicked(state.name, e.screenX, e.screenY);
+      return;
+    }
+  }
+});
+
 // Mouse move: toggle click-through
 canvas.addEventListener('mousemove', (e) => {
   let overCharacter = false;
   for (const state of characterStates) {
     if (!state.visible) continue;
-    const bottomY = canvas.height / window.devicePixelRatio - 10;
+    const canvasH = canvas.height / window.devicePixelRatio;
+    const bottomY = canvasH - 10;
     const charLeft = state.x - state.width / 2;
     const charTop = bottomY - state.height;
-    const zoneWidth = state.width * 0.6;
-    const zoneHeight = state.height * 0.6;
+    const zoneWidth = state.width * 0.7;
+    const zoneHeight = state.height * 0.7;
     const zoneLeft = charLeft + (state.width - zoneWidth) / 2;
     const zoneTop = charTop + (state.height - zoneHeight) / 2;
 
@@ -165,49 +211,54 @@ canvas.addEventListener('mousemove', (e) => {
   canvas.style.cursor = overCharacter ? 'pointer' : 'default';
 });
 
-// Load sprites
+// Lazy sprite loading — load in batches to avoid blocking
 function loadSprites(name, frameCount) {
-  const sheet = { images: [], loaded: false };
-  let loadedCount = 0;
-  for (let i = 1; i <= frameCount; i++) {
-    const img = new Image();
-    const paddedIndex = i.toString().padStart(3, '0');
-    img.src = `../../../assets/sprites/${name}/${name}-${paddedIndex}.png`;
-    img.onload = () => { loadedCount++; if (loadedCount === frameCount) sheet.loaded = true; };
-    img.onerror = () => { loadedCount++; if (loadedCount === frameCount) sheet.loaded = true; };
-    sheet.images.push(img);
+  const sheet = { images: new Array(frameCount), loaded: false, loadedCount: 0 };
+  const BATCH_SIZE = 20;
+
+  function loadBatch(startIdx) {
+    const endIdx = Math.min(startIdx + BATCH_SIZE, frameCount);
+    for (let i = startIdx; i < endIdx; i++) {
+      const img = new Image();
+      const paddedIndex = (i + 1).toString().padStart(3, '0');
+      img.src = `../../../assets/sprites/${name}/${name}-${paddedIndex}.png`;
+      img.onload = () => {
+        sheet.loadedCount++;
+        if (sheet.loadedCount === frameCount) {
+          sheet.loaded = true;
+          console.log('[overlay.js] All', frameCount, 'frames loaded for', name);
+        }
+      };
+      img.onerror = () => {
+        sheet.loadedCount++;
+        if (sheet.loadedCount === frameCount) sheet.loaded = true;
+      };
+      sheet.images[i] = img;
+    }
+    if (endIdx < frameCount) {
+      setTimeout(() => loadBatch(endIdx), 50); // Load next batch after 50ms
+    }
   }
+
   sprites.set(name, sheet);
+  loadBatch(0);
 }
 
 // Init
-console.log('[overlay.js] Initializing...');
-console.log('[overlay.js] window.lilAgents:', typeof window.lilAgents);
-console.log('[overlay.js] canvas:', canvas ? canvas.width + 'x' + canvas.height : 'null');
-
 resizeCanvas();
-console.log('[overlay.js] Canvas resized to:', canvas.width, 'x', canvas.height);
 window.addEventListener('resize', resizeCanvas);
 
-// Load 301 frames per character (extracted from original HEVC .mov files at 30fps)
 loadSprites('bruce', 301);
 loadSprites('jazz', 301);
 
 if (window.lilAgents) {
   window.lilAgents.onUpdateCharacters((states) => {
     characterStates = states;
-    if (states.length > 0 && !window._loggedFirstUpdate) {
-      console.log('[overlay.js] First character update:', JSON.stringify(states[0]));
-      window._loggedFirstUpdate = true;
-    }
   });
   window.lilAgents.onThemeChanged((dark) => { isDarkTheme = dark; });
-
   requestAnimationFrame(render);
   window.lilAgents.reportReady();
-  console.log('[overlay.js] Ready, render loop started');
 } else {
   console.error('[overlay.js] window.lilAgents is undefined! Preload failed.');
-  // Still start the render loop for debugging
   requestAnimationFrame(render);
 }

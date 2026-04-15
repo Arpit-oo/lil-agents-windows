@@ -1,5 +1,6 @@
 export const IPC = {
   CHARACTER_CLICKED: 'character:clicked',
+  CHARACTER_RIGHT_CLICKED: 'character:right-clicked',
   OVERLAY_READY: 'overlay:ready',
   UPDATE_CHARACTERS: 'characters:update',
   SET_THINKING: 'character:thinking',

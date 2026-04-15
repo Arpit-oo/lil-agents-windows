@@ -12,6 +12,9 @@ contextBridge.exposeInMainWorld('lilAgents', {
   characterClicked: (name: string) => {
     ipcRenderer.send(IPC.CHARACTER_CLICKED, name);
   },
+  characterRightClicked: (name: string, screenX: number, screenY: number) => {
+    ipcRenderer.send(IPC.CHARACTER_RIGHT_CLICKED, name, screenX, screenY);
+  },
   reportReady: () => {
     ipcRenderer.send(IPC.OVERLAY_READY);
   },
