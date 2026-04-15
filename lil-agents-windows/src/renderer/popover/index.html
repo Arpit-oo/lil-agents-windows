@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="popover.css">
+  <title>Lil Agents Chat</title>
+</head>
+<body>
+  <div id="titlebar">
+    <span id="provider-name">Claude</span>
+    <div id="titlebar-actions">
+      <button id="btn-refresh" title="New session">&#x21bb;</button>
+      <button id="btn-copy" title="Copy last response">&#x2398;</button>
+    </div>
+  </div>
+  <div id="messages"></div>
+  <div id="input-area">
+    <input type="text" id="input-field" placeholder="Ask Claude..." autocomplete="off" />
+  </div>
+  <script src="popover.js"></script>
+</body>
+</html>
