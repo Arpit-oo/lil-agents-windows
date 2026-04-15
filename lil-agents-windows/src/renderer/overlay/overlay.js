@@ -312,6 +312,16 @@ if (window.lilAgents) {
     el.src = 'file:///' + filePath.replace(/\\/g, '/');
   });
 
+  // Listen for animation reset — remove custom GIF, go back to sprite sheet
+  window.lilAgents.onAnimationReset((name) => {
+    console.log('[overlay.js] Resetting animation for', name);
+    const old = customAnimations.get(name);
+    if (old && old.el && old.el.parentNode) {
+      old.el.parentNode.removeChild(old.el);
+    }
+    customAnimations.delete(name);
+  });
+
   requestAnimationFrame(render);
   window.lilAgents.reportReady();
 } else {

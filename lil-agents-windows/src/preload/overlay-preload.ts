@@ -24,4 +24,7 @@ contextBridge.exposeInMainWorld('lilAgents', {
   onAnimationChanged: (callback: (name: string, filePath: string) => void) => {
     ipcRenderer.on('character:animation-changed', (_event, name, filePath) => callback(name, filePath));
   },
+  onAnimationReset: (callback: (name: string) => void) => {
+    ipcRenderer.on('character:animation-reset', (_event, name) => callback(name));
+  },
 });

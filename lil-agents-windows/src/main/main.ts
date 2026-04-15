@@ -224,7 +224,24 @@ app.whenReady().then(() => {
   }
 
   // Create overlay window
-  createOverlayWindow();
+  const overlayWin = createOverlayWindow();
+
+  // Restore custom animations from settings after overlay loads
+  overlayWin.webContents.on('did-finish-load', () => {
+    for (const char of CHARACTERS) {
+      const customAnim = settings.get(`characters.${char.name}.customAnimation` as any) as string | undefined;
+      if (customAnim) {
+        const fs = require('fs');
+        if (fs.existsSync(customAnim)) {
+          overlayWin.webContents.send('character:animation-changed', char.name, customAnim);
+          console.log(`[main] Restored custom animation for ${char.name}: ${customAnim}`);
+        } else {
+          // File no longer exists, clear the setting
+          settings.set(`characters.${char.name}.customAnimation` as any, undefined);
+        }
+      }
+    }
+  });
 
   // Create system tray (can be disabled in dev for diagnostics)
   if (process.env.LIL_AGENTS_NO_TRAY === '1') {
@@ -393,30 +410,42 @@ app.whenReady().then(() => {
 
     menuItems.push({ type: 'separator' });
     menuItems.push({
-        label: 'Change animation...',
-        click: () => {
-          dialog.showOpenDialog({
-            title: `Choose animation for ${name === 'bruce' ? 'Bruce' : 'Jazz'}`,
-            filters: [
-              { name: 'Images', extensions: ['gif', 'png', 'webp', 'apng'] },
-            ],
-            properties: ['openFile'],
-          }).then(result => {
-            if (!result.canceled && result.filePaths.length > 0) {
-              const filePath = result.filePaths[0];
-              // Store custom animation path in settings
-              const settings = getSettings();
-              settings.set(`characters.${name}.customAnimation` as any, filePath);
-              // Notify overlay to reload
-              const overlay = getOverlayWindow();
-              if (overlay && !overlay.isDestroyed()) {
-                overlay.webContents.send('character:animation-changed', name, filePath);
-              }
-              console.log(`[main] Custom animation set for ${name}: ${filePath}`);
+      label: 'Change animation...',
+      click: () => {
+        dialog.showOpenDialog({
+          title: `Choose animation for ${name === 'bruce' ? 'Bruce' : 'Jazz'}`,
+          filters: [
+            { name: 'Images', extensions: ['gif', 'png', 'webp', 'apng'] },
+          ],
+          properties: ['openFile'],
+        }).then(result => {
+          if (!result.canceled && result.filePaths.length > 0) {
+            const filePath = result.filePaths[0];
+            const s = getSettings();
+            s.set(`characters.${name}.customAnimation` as any, filePath);
+            const overlay = getOverlayWindow();
+            if (overlay && !overlay.isDestroyed()) {
+              overlay.webContents.send('character:animation-changed', name, filePath);
             }
-          });
-        },
+          }
+        });
+      },
     });
+
+    // Only show reset option if a custom animation is set
+    const currentCustom = getSettings().get(`characters.${name}.customAnimation` as any);
+    if (currentCustom) {
+      menuItems.push({
+        label: 'Reset to original animation',
+        click: () => {
+          getSettings().set(`characters.${name}.customAnimation` as any, undefined);
+          const overlay = getOverlayWindow();
+          if (overlay && !overlay.isDestroyed()) {
+            overlay.webContents.send('character:animation-reset', name);
+          }
+        },
+      });
+    }
 
     const menu = Menu.buildFromTemplate(menuItems);
     menu.popup();
