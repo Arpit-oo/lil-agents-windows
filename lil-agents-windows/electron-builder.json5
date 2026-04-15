@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.lilagents.windows",
+  "productName": "Lil Agents",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "assets/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "assets",
+      "to": "assets"
+    }
+  ],
+  "win": {
+    "target": "portable",
+    "icon": "assets/icons/tray-icon.png"
+  },
+  "portable": {
+    "artifactName": "LilAgents-${version}-portable.exe"
+  }
+}
