@@ -5,9 +5,11 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 
+> **I DON'T KNOW WHAT I'M DOING. THIS MIGHT WORK. THIS MIGHT NOT WORK. YOU HAVE FULL FREEDOM TO CHANGE IT ACCORDINGLY AND WORK UPON THAT. THIS IS JUST MY INTERPRETATION OF THE ORIGINAL WORK. FEEL FREE TO FORK, BREAK, REBUILD, AND MAKE IT YOUR OWN.**
+
 Tiny AI companions that walk above your Windows taskbar.
 
-**Bruce** and **Jazz** pace back and forth at the bottom of your screen. Right-click one to launch a Claude Code session, browse previous conversations, or resume where you left off — all in a built-in mini-terminal with full terminal emulation.
+**Bruce** and **Jazz** pace back and forth at the bottom of your screen. Click one to launch a Claude Code session, browse previous conversations, or resume where you left off — all in a built-in mini-terminal with full terminal emulation.
 
 A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agents).
 
@@ -16,7 +18,7 @@ A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agen
 ## Features
 
 - **Animated characters** rendered via canvas-based sprite sheets at 60fps
-- **Right-click context menu** — start a new Claude Code session, continue the last one, pick from an interactive session browser, resume any recent conversation, change animation, hide/show the other character, or set a custom notification sound
+- **Click context menu** — click (left or right) a character to start a new Claude Code session, continue the last one, pick from an interactive session browser, resume any recent conversation, change animation, hide/show the other character, or set a custom notification sound
 - **Mini-terminal (xterm.js)** — sessions open in a built-in terminal with a purple theme, full color support, interactive prompts, and a working minimize button. Powered by xterm.js + node-pty; no external terminal window required
 - **Session management** — recent sessions are read directly from `~/.claude/projects/` (instant, no CLI call) and displayed with time-ago labels across all projects
 - **Notification chimes** — plays a random ping at 0.85 volume when Claude finishes responding (2 s idle detection), flashes a green dot on the title bar, and sends a system-tray notification when the terminal is not focused. Custom sounds can be set per-character via the right-click menu

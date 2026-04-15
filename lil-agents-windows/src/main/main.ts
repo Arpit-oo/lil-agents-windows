@@ -296,21 +296,10 @@ app.whenReady().then(() => {
     updateOverlayCharacters(states);
   }, frameTime);
 
-  // IPC: Character clicked
+  // IPC: Character clicked (left-click) — show same context menu as right-click (Option B)
   ipcMain.on(IPC.CHARACTER_CLICKED, (_event, name: CharacterName) => {
-    const states = walkerEngine.getStates();
-    const charState = states.find(s => s.name === name);
-    if (!charState) return;
-
-    const currentMonitor = getSelectedMonitor();
-    getOrCreateSession(name);
-
-    showPopover(
-      name,
-      currentMonitor.bounds.x + charState.x,
-      currentMonitor.bounds.y + currentMonitor.bounds.height - charState.height - 60,
-      charState.provider
-    );
+    // Emit the same event as right-click to reuse the context menu
+    ipcMain.emit('character:right-clicked', _event, name, 0, 0);
   });
 
   // IPC: Send message
