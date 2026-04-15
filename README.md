@@ -2,50 +2,88 @@
 
 ![lil agents](hero-thumbnail.png)
 
-Tiny AI companions that live on your macOS dock.
+Tiny AI companions that live on your screen.
 
-**Bruce** and **Jazz** walk back and forth above your dock. Click one to open an AI terminal. They walk, they think, they vibe.
+**Bruce** and **Jazz** walk back and forth above your dock (macOS) or taskbar (Windows). Click one to open an AI terminal. They walk, they think, they vibe.
 
-Supports **Claude Code**, **OpenAI Codex**, **GitHub Copilot**, and **Google Gemini** CLIs — switch between them from the menubar.
+> **I DON'T KNOW WHAT I'M DOING. THIS MIGHT WORK. THIS MIGHT NOT WORK. YOU HAVE FULL FREEDOM TO CHANGE IT ACCORDINGLY AND WORK UPON THAT. THIS IS JUST MY INTERPRETATION OF THE ORIGINAL WORK. FEEL FREE TO FORK, BREAK, REBUILD, AND MAKE IT YOUR OWN.**
 
-**[Download for macOS](https://lilagents.xyz)** · [Website](https://lilagents.xyz)
+---
 
-## features
+## Choose Your Platform
 
+### macOS (Original)
+
+The original lil agents by [Ryan Stephen](https://github.com/ryanstephen/lil-agents).
+
+- Native macOS AppKit application
 - Animated characters rendered from transparent HEVC video
-- Click a character to chat with AI in a themed popover terminal
-- Switch between Claude, Codex, Copilot, and Gemini from the menubar
 - Four visual themes: Peach, Midnight, Cloud, Moss
-- Slash commands: `/clear`, `/copy`, `/help` in the chat input
-- Copy last response button in the title bar
-- Thinking bubbles with playful phrases while your agent works
-- Sound effects on completion
-- First-run onboarding with a friendly welcome
+- Supports Claude Code, OpenAI Codex, GitHub Copilot, and Google Gemini CLIs
 - Auto-updates via Sparkle
+- **[Download for macOS](https://lilagents.xyz)** | [Original repo](https://github.com/ryanstephen/lil-agents)
 
-## requirements
+**Requirements:** macOS Sonoma (14.0+), universal binary (Apple Silicon + Intel)
 
-- macOS Sonoma (14.0+) — including Sequoia (15.x)
-- **Universal binary** — runs natively on both Apple Silicon and Intel Macs
-- At least one supported CLI installed:
-  - [Claude Code](https://claude.ai/download) — `curl -fsSL https://claude.ai/install.sh | sh`
-  - [OpenAI Codex](https://github.com/openai/codex) — `npm install -g @openai/codex`
-  - [GitHub Copilot](https://github.com/github/copilot-cli) — `brew install copilot-cli`
-  - [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) — `npm install -g @google/gemini-cli`
+**Building:** Open `lil-agents.xcodeproj` in Xcode and hit run.
 
-## building
+---
 
-Open `lil-agents.xcodeproj` in Xcode and hit run.
+### Windows (This Version)
 
-## privacy
+A Windows port built from the ground up with Electron + TypeScript. This is entirely my own work and interpretation of the original macOS app, built for my device and workflow. It is not affiliated with or endorsed by the original project.
 
-lil agents runs entirely on your Mac and sends no personal data anywhere.
+Based on the original repo: [github.com/ryanstephen/lil-agents](https://github.com/ryanstephen/lil-agents)
 
-- **Your data stays local.** The app plays bundled animations and calculates your dock size to position the characters. No project data, file paths, or personal information is collected or transmitted.
-- **AI providers.** Conversations are handled entirely by the CLI process you choose (Claude, Codex, Copilot, or Gemini) running locally. lil agents does not intercept, store, or transmit your chat content. Any data sent to the provider is governed by their respective terms and privacy policies.
-- **No accounts.** No login, no user database, no analytics in the app.
-- **Updates.** lil agents uses Sparkle to check for updates, which sends your app version and macOS version. Nothing else.
+- Electron app with canvas-based sprite animation at 60fps
+- **Built-in mini-terminal (xterm.js)** with a purple theme — click a character to launch Claude Code sessions, browse and resume previous conversations, all without leaving the app
+- Session management reads directly from `~/.claude/projects/` — instant, no CLI calls
+- Custom GIF animations — swap character walk cycles with any GIF, persisted across restarts
+- Notification chimes with system tray alerts when Claude finishes responding
+- Custom notification sounds
+- Character visibility toggles (show one or both)
+- Auto light/dark theme following Windows settings
+- Supports 6 AI providers: Claude, Codex, Copilot, Gemini, OpenCode, OpenClaw
 
-## license
+**Requirements:** Windows 10/11, Node.js 18+, Visual Studio Build Tools (for node-pty)
+
+**Quick start:**
+```bash
+cd lil-agents-windows
+npm install
+npm run dev
+```
+
+**Build portable .exe:**
+```bash
+npm run pack
+```
+
+**Full documentation:** See [lil-agents-windows/README.md](lil-agents-windows/README.md)
+
+---
+
+## How It Works
+
+Both versions share the same concept:
+
+1. Two animated characters walk at the bottom of your screen
+2. Click a character to interact with an AI CLI tool
+3. Characters show thinking bubbles while the AI works
+4. A sound plays when the response is ready
+5. Settings accessible via system tray (Windows) or menubar (macOS)
+
+The macOS version uses native AppKit with transparent HEVC video. The Windows version uses Electron with canvas sprite sheets and an embedded xterm.js terminal for full Claude Code interactivity.
+
+## Credits
+
+- **Original macOS app** by [Ryan Stephen](https://github.com/ryanstephen/lil-agents) — the inspiration for everything here
+- **Windows port** by [Arpit](https://github.com/Arpit-oo) — built as an interpretation and adaptation for Windows
+
+## Privacy
+
+lil agents runs entirely on your machine and sends no personal data anywhere. AI conversations are handled by the CLI process you choose (Claude, Codex, etc.) running locally. The app does not intercept, store, or transmit your chat content.
+
+## License
 
 MIT License. See [LICENSE](LICENSE) for details.
