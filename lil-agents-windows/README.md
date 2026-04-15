@@ -1,0 +1,141 @@
+# lil agents for Windows
+
+[![Windows](https://img.shields.io/badge/platform-Windows%2010%2F11-0078D6?logo=windows)](https://www.microsoft.com/windows)
+[![Electron](https://img.shields.io/badge/Electron-41-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
+
+Tiny AI companions that walk above your Windows taskbar.
+
+**Bruce** and **Jazz** pace back and forth at the bottom of your screen. Right-click one to launch a Claude Code session, browse previous conversations, or resume where you left off — all in a real PowerShell window.
+
+A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agents).
+
+![Screenshot](docs/screenshot.png)
+
+## Features
+
+- **Animated characters** rendered via canvas-based sprite sheets at 60fps
+- **Right-click context menu** — start a new Claude Code session, continue the last one, pick from an interactive session browser, or resume any recent conversation
+- **6 AI providers** — Claude, Codex, Copilot, Gemini, OpenCode, and OpenClaw
+- **System tray** with full settings: per-character provider, size, visibility, sound, and display selection
+- **Auto light/dark theme** following your Windows appearance settings
+- **Speech bubbles** with randomized thinking and completion phrases
+- **Sound effects** on task completion
+- **Custom GIF animations** — right-click a character and choose "Change animation..." to use your own
+- **Character toggle** — show both characters, or just Bruce or Jazz (via tray menu)
+- **Smooth walking** with ease-in/ease-out animation and collision avoidance between characters
+
+## Getting Started
+
+### Requirements
+
+- Windows 10 or 11
+- [Node.js](https://nodejs.org/) 18+
+- At least one supported AI CLI installed (see [Providers](#providers) below)
+- [FFmpeg](https://ffmpeg.org/) (only if extracting sprite sheets from the original macOS `.mov` files)
+
+### Install and run
+
+```bash
+cd lil-agents-windows
+npm install
+npm run dev
+```
+
+The app launches a transparent overlay window above your taskbar. Two characters will begin walking immediately.
+
+### Build a portable executable
+
+```bash
+npm run pack
+```
+
+This produces `release/LilAgents-1.0.0-portable.exe` — a single file you can run on any Windows 10/11 machine without installing Node.js.
+
+## Providers
+
+The following CLI tools are supported. Install whichever you want to use, then select it per-character from the tray menu or right-click context menu.
+
+| Provider | Install |
+|----------|---------|
+| [Claude Code](https://claude.ai/download) | `npm install -g @anthropic-ai/claude-code` |
+| [OpenAI Codex](https://github.com/openai/codex) | `npm install -g @openai/codex` |
+| [GitHub Copilot](https://github.com/github/copilot-cli) | `npm install -g @githubnext/github-copilot-cli` |
+| [Google Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm install -g @google/gemini-cli` |
+| [OpenCode](https://github.com/nicholasgriffintn/opencode) | `npm install -g opencode` |
+| [OpenClaw](https://github.com/openclaw/openclaw) | See project README |
+
+## Customization
+
+### Character animations
+
+By default, characters use sprite sheets extracted from the original macOS HEVC videos. To generate them yourself:
+
+```bash
+ffmpeg -i ../LilAgents/walk-bruce-01.mov -vf "fps=30" -pix_fmt rgba assets/sprites/bruce/bruce-%03d.png
+ffmpeg -i ../LilAgents/walk-jazz-01.mov -vf "fps=30" -pix_fmt rgba assets/sprites/jazz/jazz-%03d.png
+```
+
+You can also use any custom GIF: right-click a character and select **Change animation...** to pick a file from disk.
+
+### Themes
+
+The app automatically follows your Windows light or dark mode setting. No manual configuration needed.
+
+### Character visibility
+
+Open the system tray menu and navigate to **Characters** to toggle between showing both characters, Bruce only, or Jazz only.
+
+### Per-character settings
+
+Right-click a character or use the tray menu to configure each one independently:
+
+- AI provider
+- Character size
+- Visibility
+- Sound on/off
+- Display (for multi-monitor setups)
+
+## Architecture
+
+```
+src/
+├── main/                  Electron main process
+│   ├── main.ts            App entry point, IPC wiring, animation loop
+│   ├── characters/        Character configuration, walker engine
+│   ├── sessions/          AI provider session classes, Claude launcher
+│   ├── settings.ts        electron-store based settings persistence
+│   ├── monitor.ts         Display/monitor detection
+│   ├── tray.ts            System tray icon and menu
+│   ├── overlay-window.ts  Transparent fullscreen window for characters
+│   └── popover-window.ts  Chat terminal popover
+├── renderer/              Browser-side code
+│   ├── overlay/           Canvas sprite renderer, click detection
+│   └── popover/           Chat terminal UI
+├── preload/               Electron context bridge scripts
+└── shared/                TypeScript types, IPC channel constants
+```
+
+**Key design decisions:**
+
+- **Canvas rendering** — Characters are drawn on an HTML5 canvas at 60fps in a transparent, click-through overlay window positioned above the taskbar.
+- **electron-store** — All settings (provider, size, visibility, sound, custom GIF paths) are persisted locally with no external dependencies.
+- **Node child_process** — AI sessions are launched as real PowerShell processes, giving you a native terminal experience rather than a web-based emulator.
+- **IPC architecture** — Main process owns all state and logic; renderer processes communicate exclusively through typed IPC channels defined in `src/shared/ipc-channels.ts`.
+
+## Privacy
+
+lil agents runs entirely on your machine and sends no personal data anywhere.
+
+- **Your data stays local.** The app renders bundled animations and reads your taskbar position. No project data, file paths, or personal information is collected or transmitted.
+- **AI providers.** Conversations are handled by whichever CLI you choose, running as a local process. lil agents does not intercept, store, or transmit your chat content.
+- **No accounts.** No login, no analytics, no telemetry.
+
+## Credits
+
+This is a Windows port of [lil agents](https://github.com/ryanstephen/lil-agents) by Ryan Stephen — the original macOS app that puts animated AI companions on your Dock. All character designs and walking animations originate from that project.
+
+## License
+
+MIT License. See [LICENSE](../LICENSE) for details.
