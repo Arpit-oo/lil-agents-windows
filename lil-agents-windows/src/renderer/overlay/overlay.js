@@ -21,10 +21,9 @@ function resizeCanvas() {
 }
 
 function drawCharacter(state) {
-  // Check for custom GIF animation first
-  if (customAnimations.has(state.name) && drawCustomAnimation(state)) {
-    return; // Custom animation handled it
-  }
+  // If this character has a custom GIF, the <img> element handles rendering
+  const custom = customAnimations.get(state.name);
+  if (custom && custom.active) return;
 
   const sprite = sprites.get(state.name);
   const canvasH = canvas.height / window.devicePixelRatio;
@@ -140,6 +139,7 @@ function drawBubble(state) {
 
 function render() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  updateGifPositions();
   for (const state of characterStates) {
     if (!state.visible) continue;
     drawCharacter(state);
@@ -256,27 +256,28 @@ window.addEventListener('resize', resizeCanvas);
 loadSprites('bruce', 301);
 loadSprites('jazz', 301);
 
-// Custom GIF animations — stored per character
-let customAnimations = new Map(); // name -> { img: HTMLImageElement, loaded: boolean }
+// Custom GIF animations — use real <img> elements so browser animates the GIF natively
+const gifLayer = document.getElementById('gif-layer');
+let customAnimations = new Map(); // name -> { el: HTMLImageElement, active: boolean }
 
-function drawCustomAnimation(state) {
-  const custom = customAnimations.get(state.name);
-  if (!custom || !custom.loaded) return false;
+// Position GIF elements each frame (called from render loop)
+function updateGifPositions() {
+  for (const state of characterStates) {
+    const custom = customAnimations.get(state.name);
+    if (!custom || !custom.active) continue;
 
-  const canvasH = canvas.height / window.devicePixelRatio;
-  const bottomY = canvasH - 10;
-  const yPos = bottomY - state.height;
+    const canvasH = canvas.height / window.devicePixelRatio;
+    const bottomY = canvasH - 10;
+    const yPos = bottomY - state.height;
+    const xPos = state.x - state.width / 2;
 
-  ctx.save();
-  if (state.flipped) {
-    ctx.translate(state.x, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(custom.img, -state.width / 2, yPos, state.width, state.height);
-  } else {
-    ctx.drawImage(custom.img, state.x - state.width / 2, yPos, state.width, state.height);
+    custom.el.style.left = xPos + 'px';
+    custom.el.style.top = yPos + 'px';
+    custom.el.style.width = state.width + 'px';
+    custom.el.style.height = state.height + 'px';
+    custom.el.style.display = state.visible ? 'block' : 'none';
+    custom.el.style.transform = state.flipped ? 'scaleX(-1)' : '';
   }
-  ctx.restore();
-  return true;
 }
 
 if (window.lilAgents) {
@@ -285,19 +286,30 @@ if (window.lilAgents) {
   });
   window.lilAgents.onThemeChanged((dark) => { isDarkTheme = dark; });
 
-  // Listen for custom animation changes
+  // Listen for custom animation changes — create real <img> elements for GIF animation
   window.lilAgents.onAnimationChanged((name, filePath) => {
     console.log('[overlay.js] Loading custom animation for', name, ':', filePath);
-    const img = new Image();
-    img.onload = () => {
-      customAnimations.set(name, { img, loaded: true });
-      console.log('[overlay.js] Custom animation loaded for', name);
+
+    // Remove old GIF element if exists
+    const old = customAnimations.get(name);
+    if (old && old.el && old.el.parentNode) {
+      old.el.parentNode.removeChild(old.el);
+    }
+
+    const el = document.createElement('img');
+    el.style.position = 'absolute';
+    el.style.pointerEvents = 'none';
+    el.style.display = 'none'; // Hidden until positioned
+
+    el.onload = () => {
+      customAnimations.set(name, { el, active: true });
+      gifLayer.appendChild(el);
+      console.log('[overlay.js] Custom GIF animation active for', name);
     };
-    img.onerror = () => {
+    el.onerror = () => {
       console.error('[overlay.js] Failed to load custom animation:', filePath);
     };
-    // Use file:// protocol for local files
-    img.src = 'file:///' + filePath.replace(/\\/g, '/');
+    el.src = 'file:///' + filePath.replace(/\\/g, '/');
   });
 
   requestAnimationFrame(render);

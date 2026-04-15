@@ -171,6 +171,42 @@ function updateTrayMenu(callbacks: TrayCallbacks): void {
       ],
     },
     { type: 'separator' },
+    {
+      label: 'Characters',
+      submenu: [
+        {
+          label: 'Show both',
+          click: () => {
+            settings.set('characters.bruce.visible' as any, true);
+            settings.set('characters.jazz.visible' as any, true);
+            callbacks.onVisibilityChange('bruce', true);
+            callbacks.onVisibilityChange('jazz', true);
+            updateTrayMenu(callbacks);
+          },
+        },
+        {
+          label: 'Bruce only',
+          click: () => {
+            settings.set('characters.bruce.visible' as any, true);
+            settings.set('characters.jazz.visible' as any, false);
+            callbacks.onVisibilityChange('bruce', true);
+            callbacks.onVisibilityChange('jazz', false);
+            updateTrayMenu(callbacks);
+          },
+        },
+        {
+          label: 'Jazz only',
+          click: () => {
+            settings.set('characters.bruce.visible' as any, false);
+            settings.set('characters.jazz.visible' as any, true);
+            callbacks.onVisibilityChange('bruce', false);
+            callbacks.onVisibilityChange('jazz', true);
+            updateTrayMenu(callbacks);
+          },
+        },
+      ],
+    },
+    { type: 'separator' },
     { label: 'Refresh Sessions', click: () => callbacks.onRefreshAll() },
     { type: 'separator' },
     { label: 'Quit', click: () => app.quit() },
