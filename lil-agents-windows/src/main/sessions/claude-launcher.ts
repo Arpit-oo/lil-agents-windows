@@ -120,9 +120,23 @@ export function getSessionLabel(sessionId: string, projectDir: string): Promise<
 }
 
 /**
- * Launch Claude Code in a NEW visible PowerShell window.
+ * Convert the encoded project folder name back to a real Windows path.
+ * e.g. "C--code-lil-agents" -> "C:\code\lil-agents"
  */
-export async function launchInPowerShell(mode: 'new' | 'continue' | 'resume' | 'resume-pick', sessionId?: string): Promise<void> {
+export function projectDirToPath(projectDir: string): string {
+  // projectDir format: "C:/code/lil-agents" (already converted in listClaudeSessions)
+  return projectDir.replace(/\//g, '\\');
+}
+
+/**
+ * Launch Claude Code in a NEW visible PowerShell window.
+ * When resuming a session, cd to its project directory first.
+ */
+export async function launchInPowerShell(
+  mode: 'new' | 'continue' | 'resume' | 'resume-pick',
+  sessionId?: string,
+  projectDir?: string,
+): Promise<void> {
   const binaryPath = await findBinary('claude');
   if (!binaryPath) {
     console.error('[claude-launcher] Claude CLI not found');
@@ -141,12 +155,20 @@ export async function launchInPowerShell(mode: 'new' | 'continue' | 'resume' | '
       claudeArgs = sessionId ? `--resume ${sessionId}` : '--continue';
       break;
     case 'resume-pick':
-      claudeArgs = '--resume'; // Opens interactive picker
+      claudeArgs = '--resume';
       break;
   }
 
-  // Use cmd /c start to open a visible PowerShell window
-  const cmd = `start "" powershell -NoExit -Command "& '${binaryPath}' ${claudeArgs}"`;
+  // Build PowerShell command — cd to project dir first if resuming a specific session
+  let psCommand = '';
+  if (projectDir && (mode === 'resume' || mode === 'continue')) {
+    const winPath = projectDirToPath(projectDir);
+    psCommand = `cd '${winPath}'; & '${binaryPath}' ${claudeArgs}`;
+  } else {
+    psCommand = `& '${binaryPath}' ${claudeArgs}`;
+  }
+
+  const cmd = `start "" powershell -NoExit -Command "${psCommand}"`;
 
   exec(cmd, { windowsHide: false }, (err) => {
     if (err) {

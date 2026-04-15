@@ -386,7 +386,7 @@ app.whenReady().then(() => {
         const projectLabel = session.projectDir.split('/').pop() || session.projectDir;
         menuItems.push({
           label: `${projectLabel} — ${shortId}... (${session.sizeKB}KB, ${timeAgo})`,
-          click: () => launchInPowerShell('resume', session.id),
+          click: () => launchInPowerShell('resume', session.id, session.projectDir),
         });
       }
     }
