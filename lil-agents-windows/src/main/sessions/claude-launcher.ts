@@ -4,6 +4,40 @@ import * as path from 'path';
 import * as readline from 'readline';
 import { findBinary } from '../shell-environment';
 
+/**
+ * Decode a Claude projects folder name back to a real Windows path.
+ * e.g. "C--code-lil-agents" -> "C:\code\lil-agents"
+ * Uses DFS to find which combination of path separators vs hyphens produces an existing path.
+ */
+function decodeFolderToPath(encoded: string): string {
+  const driveMatch = encoded.match(/^([A-Z])--(.*)$/);
+  if (!driveMatch) return encoded;
+
+  const drive = driveMatch[1];
+  const rest = driveMatch[2];
+  const parts = rest.split('-');
+
+  function solve(idx: number, segments: string[]): string | null {
+    if (idx >= parts.length) {
+      const p = drive + ':\\' + segments.join('\\');
+      return fs.existsSync(p) ? p : null;
+    }
+    // Option 1: new path segment
+    const result1 = solve(idx + 1, [...segments, parts[idx]]);
+    if (result1) return result1;
+    // Option 2: append with hyphen to last segment
+    if (segments.length > 0) {
+      const withHyphen = [...segments];
+      withHyphen[withHyphen.length - 1] += '-' + parts[idx];
+      const result2 = solve(idx + 1, withHyphen);
+      if (result2) return result2;
+    }
+    return null;
+  }
+
+  return solve(0, []) || (drive + ':\\' + rest.replace(/-/g, '\\'));
+}
+
 export interface ClaudeSession {
   id: string;
   label: string;
@@ -39,7 +73,7 @@ export function listClaudeSessions(): ClaudeSession[] {
         sessions.push({
           id,
           label: '', // Will be filled with first user message
-          projectDir: project.replace(/--/g, '/').replace(/^C-/, 'C:'),
+          projectDir: decodeFolderToPath(project),
           modifiedAt: stat.mtimeMs,
           sizeKB: Math.round(stat.size / 1024),
         });
@@ -120,12 +154,10 @@ export function getSessionLabel(sessionId: string, projectDir: string): Promise<
 }
 
 /**
- * Convert the encoded project folder name back to a real Windows path.
- * e.g. "C--code-lil-agents" -> "C:\code\lil-agents"
+ * Identity — projectDir is now already a valid Windows path from decodeFolderToPath.
  */
 export function projectDirToPath(projectDir: string): string {
-  // projectDir format: "C:/code/lil-agents" (already converted in listClaudeSessions)
-  return projectDir.replace(/\//g, '\\');
+  return projectDir;
 }
 
 /**

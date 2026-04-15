@@ -7,7 +7,7 @@
 
 Tiny AI companions that walk above your Windows taskbar.
 
-**Bruce** and **Jazz** pace back and forth at the bottom of your screen. Right-click one to launch a Claude Code session, browse previous conversations, or resume where you left off — all in a real PowerShell window.
+**Bruce** and **Jazz** pace back and forth at the bottom of your screen. Right-click one to launch a Claude Code session, browse previous conversations, or resume where you left off — all in a built-in mini-terminal with full terminal emulation.
 
 A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agents).
 
@@ -16,14 +16,16 @@ A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agen
 ## Features
 
 - **Animated characters** rendered via canvas-based sprite sheets at 60fps
-- **Right-click context menu** — start a new Claude Code session, continue the last one, pick from an interactive session browser, or resume any recent conversation
+- **Right-click context menu** — start a new Claude Code session, continue the last one, pick from an interactive session browser, resume any recent conversation, change animation, hide/show the other character, or set a custom notification sound
+- **Mini-terminal (xterm.js)** — sessions open in a built-in terminal with a purple theme, full color support, interactive prompts, and a working minimize button. Powered by xterm.js + node-pty; no external terminal window required
+- **Session management** — recent sessions are read directly from `~/.claude/projects/` (instant, no CLI call) and displayed with time-ago labels across all projects
+- **Notification chimes** — plays a random ping at 0.85 volume when Claude finishes responding (2 s idle detection), flashes a green dot on the title bar, and sends a system-tray notification when the terminal is not focused. Custom sounds can be set per-character via the right-click menu
 - **6 AI providers** — Claude, Codex, Copilot, Gemini, OpenCode, and OpenClaw
 - **System tray** with full settings: per-character provider, size, visibility, sound, and display selection
 - **Auto light/dark theme** following your Windows appearance settings
 - **Speech bubbles** with randomized thinking and completion phrases
-- **Sound effects** on task completion
-- **Custom GIF animations** — right-click a character and choose "Change animation..." to use your own
-- **Character toggle** — show both characters, or just Bruce or Jazz (via tray menu)
+- **Custom GIF animations** — right-click a character and choose "Change animation..." to use your own; the choice persists across restarts. "Reset to original animation" is also available in the same menu
+- **Character toggle** — right-click a character to hide/show the other one, or use tray menu → **Characters** → Show both / Bruce only / Jazz only
 - **Smooth walking** with ease-in/ease-out animation and collision avoidance between characters
 
 ## Getting Started
@@ -33,6 +35,7 @@ A Windows port of [lil agents for macOS](https://github.com/ryanstephen/lil-agen
 - Windows 10 or 11
 - [Node.js](https://nodejs.org/) 18+
 - At least one supported AI CLI installed (see [Providers](#providers) below)
+- **Visual Studio Build Tools** (or `npm install --global windows-build-tools`) — required to compile [node-pty](https://github.com/microsoft/node-pty), which powers the built-in terminal. Install the "Desktop development with C++" workload from the [VS Build Tools installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 - [FFmpeg](https://ffmpeg.org/) (only if extracting sprite sheets from the original macOS `.mov` files)
 
 ### Install and run
@@ -85,7 +88,7 @@ The app automatically follows your Windows light or dark mode setting. No manual
 
 ### Character visibility
 
-Open the system tray menu and navigate to **Characters** to toggle between showing both characters, Bruce only, or Jazz only.
+Open the system tray menu and navigate to **Characters** to toggle between showing both characters, Bruce only, or Jazz only. You can also right-click a character and choose **Hide/Show other character** to toggle the companion directly.
 
 ### Per-character settings
 
@@ -94,8 +97,22 @@ Right-click a character or use the tray menu to configure each one independently
 - AI provider
 - Character size
 - Visibility
-- Sound on/off
+- Sound on/off and custom notification sound
 - Display (for multi-monitor setups)
+
+### Right-click context menu
+
+Right-clicking a character exposes:
+
+- **New session** — start a fresh AI session
+- **Continue last** — resume the most recent conversation
+- **Pick session** — interactive picker to choose any session
+- **Browse recent sessions** — view sessions from all projects with time-ago labels
+- **Change animation** — swap in a custom GIF; saved and restored on restart
+- **Reset to original animation** — revert to the default sprite sheet
+- **Hide/Show other character** — toggle the companion character
+- **Set custom notification sound** — choose a `.wav`/`.mp3` file to play on completion
+- **Other AI tools** — launch Gemini CLI, Codex, Copilot, or OpenCode directly in the mini-terminal
 
 ## Architecture
 
@@ -120,8 +137,10 @@ src/
 **Key design decisions:**
 
 - **Canvas rendering** — Characters are drawn on an HTML5 canvas at 60fps in a transparent, click-through overlay window positioned above the taskbar.
-- **electron-store** — All settings (provider, size, visibility, sound, custom GIF paths) are persisted locally with no external dependencies.
-- **Node child_process** — AI sessions are launched as real PowerShell processes, giving you a native terminal experience rather than a web-based emulator.
+- **electron-store** — All settings (provider, size, visibility, sound, custom GIF paths, custom animation paths) are persisted locally with no external dependencies.
+- **xterm.js + node-pty** — AI sessions run inside a built-in terminal emulator (xterm.js) backed by a real PTY (node-pty). This gives full color output, interactive prompts, and a purple-themed UI without spawning an external terminal window. node-pty is a native module and requires Visual Studio Build Tools to compile.
+- **Session discovery** — Recent Claude sessions are read directly from `~/.claude/projects/` on the fly; no CLI invocation is needed. Directory names are decoded (hyphen-separated path segments) to reconstruct the original file-system path.
+- **Idle detection** — A 2-second silence timer after the last PTY output triggers the completion chime, green-dot title-bar flash, and optional system-tray notification.
 - **IPC architecture** — Main process owns all state and logic; renderer processes communicate exclusively through typed IPC channels defined in `src/shared/ipc-channels.ts`.
 
 ## Privacy

@@ -11,6 +11,7 @@ import { showPopover, sendToPopover, closeAllPopovers, getPopoverWindow } from '
 import { createSession, AgentSession, AgentSessionCallbacks } from './sessions/index';
 import { createTray, destroyTray } from './tray';
 import { getSelectedMonitor } from './monitor';
+import { openTerminal, closeAllTerminals } from './terminal-window';
 
 process.on('uncaughtException', (error) => {
   console.error('[main] uncaughtException:', error);
@@ -371,44 +372,101 @@ app.whenReady().then(() => {
 
   // IPC: Character right-clicked — show session context menu instantly
   ipcMain.on('character:right-clicked', (_event, name: CharacterName, _screenX: number, _screenY: number) => {
-    const { launchInPowerShell, listClaudeSessions, getSessionLabel } = require('./sessions/claude-launcher');
+    const { launchInPowerShell, listClaudeSessions, getClaudeLaunchCommand, projectDirToPath } = require('./sessions/claude-launcher');
+    const { findBinary } = require('./shell-environment');
+
+    // Helper: open any CLI tool in the mini-terminal
+    const openInTerminal = async (binaryName: string, cliArgs: string[], cwd?: string) => {
+      const binaryPath = await findBinary(binaryName as any);
+      if (!binaryPath) {
+        console.error(`[main] ${binaryName} CLI not found`);
+        return;
+      }
+      const states = walkerEngine.getStates();
+      const charState = states.find((s: any) => s.name === name);
+      const currentMonitor = getSelectedMonitor();
+      const x = currentMonitor.bounds.x + (charState?.x || 400);
+      const y = currentMonitor.bounds.y + currentMonitor.bounds.height - 300;
+      openTerminal(name, x, y, binaryPath, cliArgs, cwd);
+    };
 
     // Read sessions from disk — instant, no CLI call
     const allSessions = listClaudeSessions();
 
+    // Most recent project dir for context-aware commands
+    const mostRecentCwd = allSessions.length > 0
+      ? projectDirToPath(allSessions[0].projectDir)
+      : undefined;
+
     const menuItems: Electron.MenuItemConstructorOptions[] = [
       {
         label: 'New Claude session',
-        click: () => launchInPowerShell('new'),
+        click: () => openInTerminal('claude', []),
       },
       {
-        label: 'Continue last session (this folder)',
-        click: () => launchInPowerShell('continue'),
+        label: 'Continue last session',
+        click: () => openInTerminal('claude', ['--continue'], mostRecentCwd),
       },
       {
         label: 'Pick session (interactive)',
-        click: () => launchInPowerShell('resume-pick'),
+        click: () => openInTerminal('claude', ['--resume'], mostRecentCwd),
       },
     ];
 
-    // Add recent sessions from disk
+    // Add recent sessions grouped by project
     if (allSessions.length > 0) {
       menuItems.push({ type: 'separator' });
       menuItems.push({ label: `Recent sessions (${allSessions.length} total)`, enabled: false });
 
-      // Show up to 12 most recent sessions
       for (const session of allSessions.slice(0, 12)) {
         const timeAgo = getTimeAgo(session.modifiedAt);
         const shortId = session.id.slice(0, 8);
         const projectLabel = session.projectDir.split('/').pop() || session.projectDir;
+        const cwd = projectDirToPath(session.projectDir);
         menuItems.push({
           label: `${projectLabel} — ${shortId}... (${session.sizeKB}KB, ${timeAgo})`,
-          click: () => launchInPowerShell('resume', session.id, session.projectDir),
+          click: () => openInTerminal('claude', ['--resume', session.id], cwd),
         });
       }
     }
 
+    // Other AI tools submenu
     menuItems.push({ type: 'separator' });
+    menuItems.push({
+      label: 'Other AI tools',
+      submenu: [
+        { label: 'Gemini CLI', click: () => openInTerminal('gemini', []) },
+        { label: 'Codex', click: () => openInTerminal('codex', []) },
+        { label: 'Copilot', click: () => openInTerminal('copilot', []) },
+        { label: 'OpenCode', click: () => openInTerminal('opencode', []) },
+      ],
+    });
+
+    // Character visibility + animation options
+    menuItems.push({ type: 'separator' });
+
+    const otherChar: CharacterName = name === 'bruce' ? 'jazz' : 'bruce';
+    const otherLabel = otherChar === 'bruce' ? 'Bruce' : 'Jazz';
+    const otherVisible = (getSettings().get(`characters.${otherChar}.visible` as any) as boolean) ?? true;
+
+    if (otherVisible) {
+      menuItems.push({
+        label: `Hide ${otherLabel}`,
+        click: () => {
+          getSettings().set(`characters.${otherChar}.visible` as any, false);
+          walkerEngine.setCharacterVisible(otherChar, false);
+        },
+      });
+    } else {
+      menuItems.push({
+        label: `Show ${otherLabel}`,
+        click: () => {
+          getSettings().set(`characters.${otherChar}.visible` as any, true);
+          walkerEngine.setCharacterVisible(otherChar, true);
+        },
+      });
+    }
+
     menuItems.push({
       label: 'Change animation...',
       click: () => {
@@ -421,8 +479,7 @@ app.whenReady().then(() => {
         }).then(result => {
           if (!result.canceled && result.filePaths.length > 0) {
             const filePath = result.filePaths[0];
-            const s = getSettings();
-            s.set(`characters.${name}.customAnimation` as any, filePath);
+            getSettings().set(`characters.${name}.customAnimation` as any, filePath);
             const overlay = getOverlayWindow();
             if (overlay && !overlay.isDestroyed()) {
               overlay.webContents.send('character:animation-changed', name, filePath);
@@ -432,7 +489,6 @@ app.whenReady().then(() => {
       },
     });
 
-    // Only show reset option if a custom animation is set
     const currentCustom = getSettings().get(`characters.${name}.customAnimation` as any);
     if (currentCustom) {
       menuItems.push({
@@ -444,6 +500,32 @@ app.whenReady().then(() => {
             overlay.webContents.send('character:animation-reset', name);
           }
         },
+      });
+    }
+
+    menuItems.push({ type: 'separator' });
+    menuItems.push({
+      label: 'Set custom notification sound...',
+      click: () => {
+        dialog.showOpenDialog({
+          title: 'Choose notification sound',
+          filters: [
+            { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'flac'] },
+          ],
+          properties: ['openFile'],
+        }).then(result => {
+          if (!result.canceled && result.filePaths.length > 0) {
+            getSettings().set('customChime' as any, result.filePaths[0]);
+          }
+        });
+      },
+    });
+
+    const currentChime = getSettings().get('customChime' as any);
+    if (currentChime) {
+      menuItems.push({
+        label: 'Reset to default sounds',
+        click: () => getSettings().set('customChime' as any, undefined),
       });
     }
 
@@ -476,5 +558,6 @@ app.on('before-quit', () => {
     destroySession(name);
   }
   closeAllPopovers();
+  closeAllTerminals();
   destroyTray();
 });
