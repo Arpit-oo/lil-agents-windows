@@ -5,6 +5,7 @@
   "main": "dist/main/main.js",
   "scripts": {
     "dev": "tsc && electron .",
+    "dev:no-tray": "set LIL_AGENTS_NO_TRAY=1&& tsc && electron . --no-sandbox --disable-http-cache --disable-gpu-shader-disk-cache --disable-gpu-disk-cache",
     "build": "tsc",
     "start": "electron .",
     "pack": "electron-builder --win portable",

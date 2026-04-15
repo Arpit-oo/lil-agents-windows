@@ -6,6 +6,8 @@ import { CharacterState } from '../shared/types';
 import { getSelectedMonitor, getOverlayBounds } from './monitor';
 
 let overlayWindow: BrowserWindow | null = null;
+let clickThroughListenerRegistered = false;
+let recreateTimer: ReturnType<typeof setTimeout> | null = null;
 
 function resolveOverlayHtmlPath(): string {
   const distPath = path.join(__dirname, '..', 'renderer', 'overlay', 'index.html');
@@ -50,6 +52,13 @@ export function createOverlayWindow(): BrowserWindow {
   });
   overlayWindow.webContents.on('render-process-gone', (_e: any, details: any) => {
     console.error('[overlay] render-process-gone:', JSON.stringify(details));
+    overlayWindow = null;
+    if (recreateTimer) clearTimeout(recreateTimer);
+    recreateTimer = setTimeout(() => {
+      recreateTimer = null;
+      console.warn('[overlay] Recreating overlay after renderer crash...');
+      createOverlayWindow();
+    }, 800);
   });
 
   overlayWindow.on('ready-to-show', () => {
@@ -58,18 +67,28 @@ export function createOverlayWindow(): BrowserWindow {
 
   overlayWindow.loadFile(htmlPath);
 
-  ipcMain.on(IPC.SET_CLICK_THROUGH, (_event, ignore: boolean, forward: boolean) => {
-    overlayWindow?.setIgnoreMouseEvents(ignore, { forward });
-  });
+  if (!clickThroughListenerRegistered) {
+    ipcMain.on(IPC.SET_CLICK_THROUGH, (_event, ignore: boolean, forward: boolean) => {
+      overlayWindow?.setIgnoreMouseEvents(ignore, { forward });
+    });
+    clickThroughListenerRegistered = true;
+  }
 
-  overlayWindow.on('closed', () => { overlayWindow = null; });
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+  });
   return overlayWindow;
 }
 
 export function getOverlayWindow(): BrowserWindow | null { return overlayWindow; }
 
 export function sendToOverlay(channel: string, ...args: any[]): void {
-  overlayWindow?.webContents.send(channel, ...args);
+  if (!overlayWindow || overlayWindow.isDestroyed()) return;
+  try {
+    overlayWindow.webContents.send(channel, ...args);
+  } catch (error) {
+    console.warn('[overlay] sendToOverlay failed:', error);
+  }
 }
 
 export function updateOverlayCharacters(states: CharacterState[]): void {

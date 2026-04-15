@@ -1,3 +1,8 @@
 node_modules/
 dist/
 release/
+
+# Sprite sheets are large (~300MB) — regenerate from .mov files with FFmpeg
+# See scripts/extract-sprites.md
+assets/sprites/bruce/
+assets/sprites/jazz/
