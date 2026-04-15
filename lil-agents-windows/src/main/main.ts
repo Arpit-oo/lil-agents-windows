@@ -1,4 +1,4 @@
-import { app, ipcMain, nativeTheme, screen } from 'electron';
+import { app, ipcMain, Menu, nativeTheme, screen } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { IPC } from '../shared/ipc-channels';
@@ -12,13 +12,32 @@ import { createSession, AgentSession, AgentSessionCallbacks } from './sessions/i
 import { createTray, destroyTray } from './tray';
 import { getSelectedMonitor } from './monitor';
 
+process.on('uncaughtException', (error) => {
+  console.error('[main] uncaughtException:', error);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[main] unhandledRejection:', reason);
+});
+
+app.on('render-process-gone', (_event, webContents, details) => {
+  console.error('[main] render-process-gone:', webContents.getURL(), details.reason, details.exitCode);
+});
+
+app.on('child-process-gone', (_event, details) => {
+  console.error('[main] child-process-gone:', details.type, details.reason, details.exitCode);
+});
+
 // Fix Windows GPU cache "Access is denied" errors
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-gpu-disk-cache');
+app.commandLine.appendSwitch('disable-direct-composition');
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion,UseSkiaRenderer');
 
 // Disable GPU acceleration for reliable window rendering on Windows.
 // transparent: true silently breaks rendering with GPU compositing.
 app.commandLine.appendSwitch('disable-gpu');
+app.disableHardwareAcceleration();
 
 function configureDevStoragePaths(): void {
   if (app.isPackaged) return;
@@ -176,6 +195,15 @@ function destroySession(name: CharacterName): void {
   stopThinkingBubble(name);
 }
 
+function openMiniTerminal(characterName: CharacterName, sessionId?: string): void {
+  // TODO: Will be implemented with xterm.js in next task
+  console.log('[main] Opening mini-terminal for', characterName, 'session:', sessionId || 'new');
+  // For now, fall back to PowerShell
+  import('./sessions/claude-launcher').then(({ launchInPowerShell }) => {
+    launchInPowerShell(sessionId);
+  });
+}
+
 // App ready
 app.whenReady().then(() => {
   const settings = initSettings();
@@ -320,6 +348,78 @@ app.whenReady().then(() => {
         break;
       }
     }
+  });
+
+  // IPC: Character right-clicked — show session context menu
+  ipcMain.on('character:right-clicked', async (_event, name: CharacterName, screenX: number, screenY: number) => {
+    const { listClaudeSessions, launchInPowerShell } = await import('./sessions/claude-launcher');
+
+    // Fetch sessions in background
+    const claudeSessions = await listClaudeSessions();
+    const lastSessionId = claudeSessions.length > 0 ? claudeSessions[0].id : null;
+
+    const menuItems: Electron.MenuItemConstructorOptions[] = [];
+
+    // New session
+    menuItems.push({
+      label: 'New session',
+      submenu: [
+        {
+          label: 'In mini-terminal',
+          click: () => openMiniTerminal(name),
+        },
+        {
+          label: 'In PowerShell',
+          click: () => launchInPowerShell(),
+        },
+      ],
+    });
+
+    // Resume last
+    if (lastSessionId) {
+      menuItems.push({
+        label: 'Resume last session',
+        submenu: [
+          {
+            label: 'In mini-terminal',
+            click: () => openMiniTerminal(name, lastSessionId),
+          },
+          {
+            label: 'In PowerShell',
+            click: () => launchInPowerShell(lastSessionId),
+          },
+        ],
+      });
+    }
+
+    // Active sessions list
+    if (claudeSessions.length > 0) {
+      menuItems.push({ type: 'separator' });
+      menuItems.push({ label: 'Active Sessions', enabled: false });
+
+      for (const session of claudeSessions.slice(0, 10)) { // Limit to 10
+        const label = session.name || session.id.slice(0, 12);
+        menuItems.push({
+          label: `  ${label}`,
+          submenu: [
+            {
+              label: 'In mini-terminal',
+              click: () => openMiniTerminal(name, session.id),
+            },
+            {
+              label: 'In PowerShell',
+              click: () => launchInPowerShell(session.id),
+            },
+          ],
+        });
+      }
+    } else {
+      menuItems.push({ type: 'separator' });
+      menuItems.push({ label: 'No active sessions', enabled: false });
+    }
+
+    const menu = Menu.buildFromTemplate(menuItems);
+    menu.popup();
   });
 
   // Theme changes
