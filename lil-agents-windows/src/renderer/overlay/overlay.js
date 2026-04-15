@@ -189,9 +189,9 @@ resizeCanvas();
 console.log('[overlay.js] Canvas resized to:', canvas.width, 'x', canvas.height);
 window.addEventListener('resize', resizeCanvas);
 
-// Skip sprite loading for now — we'll use placeholders
-// loadSprites('bruce', 300);
-// loadSprites('jazz', 300);
+// Load 301 frames per character (extracted from original HEVC .mov files at 30fps)
+loadSprites('bruce', 301);
+loadSprites('jazz', 301);
 
 if (window.lilAgents) {
   window.lilAgents.onUpdateCharacters((states) => {

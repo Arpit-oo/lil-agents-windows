@@ -12,7 +12,7 @@ const BRUCE_CONFIG: CharacterConfig = {
   color: '#66B88C',
   spriteDir: 'sprites/bruce',
   walkCycle: {
-    totalFrames: 300,
+    totalFrames: 301,
     accelEndFrame: 90,
     fullSpeedEndFrame: 112,
     decelEndFrame: 240,
@@ -28,7 +28,7 @@ const JAZZ_CONFIG: CharacterConfig = {
   color: '#FF6600',
   spriteDir: 'sprites/jazz',
   walkCycle: {
-    totalFrames: 300,
+    totalFrames: 301,
     accelEndFrame: 117,
     fullSpeedEndFrame: 135,
     decelEndFrame: 240,
