@@ -195,13 +195,15 @@ function destroySession(name: CharacterName): void {
   stopThinkingBubble(name);
 }
 
-function openMiniTerminal(characterName: CharacterName, sessionId?: string): void {
-  // TODO: Will be implemented with xterm.js in next task
-  console.log('[main] Opening mini-terminal for', characterName, 'session:', sessionId || 'new');
-  // For now, fall back to PowerShell
-  import('./sessions/claude-launcher').then(({ launchInPowerShell }) => {
-    launchInPowerShell(sessionId);
-  });
+function getTimeAgo(timestampMs: number): string {
+  const diffMs = Date.now() - timestampMs;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 // App ready
@@ -352,51 +354,45 @@ app.whenReady().then(() => {
 
   // IPC: Character right-clicked — show session context menu instantly
   ipcMain.on('character:right-clicked', (_event, name: CharacterName, _screenX: number, _screenY: number) => {
-    const { launchInPowerShell, listClaudeSessions } = require('./sessions/claude-launcher');
+    const { launchInPowerShell, listClaudeSessions, getSessionLabel } = require('./sessions/claude-launcher');
+
+    // Read sessions from disk — instant, no CLI call
+    const allSessions = listClaudeSessions();
 
     const menuItems: Electron.MenuItemConstructorOptions[] = [
       {
         label: 'New Claude session',
-        click: () => launchInPowerShell(),
+        click: () => launchInPowerShell('new'),
       },
       {
-        label: 'Resume last session',
-        click: () => {
-          listClaudeSessions().then((sessions: any[]) => {
-            if (sessions.length > 0) {
-              launchInPowerShell(sessions[0].id);
-            } else {
-              launchInPowerShell(); // No sessions, start fresh
-            }
-          });
-        },
+        label: 'Continue last session (this folder)',
+        click: () => launchInPowerShell('continue'),
       },
-      { type: 'separator' },
       {
-        label: 'Browse sessions...',
-        click: () => {
-          // Fetch sessions async, then show a submenu
-          listClaudeSessions().then((sessions: any[]) => {
-            if (sessions.length === 0) {
-              const noSessionsMenu = Menu.buildFromTemplate([
-                { label: 'No active sessions found', enabled: false },
-                { type: 'separator' },
-                { label: 'Start new session', click: () => launchInPowerShell() },
-              ]);
-              noSessionsMenu.popup();
-              return;
-            }
-            const sessionItems: Electron.MenuItemConstructorOptions[] = sessions.slice(0, 15).map((s: any) => ({
-              label: s.name || s.id.slice(0, 16),
-              click: () => launchInPowerShell(s.id),
-            }));
-            const sessionMenu = Menu.buildFromTemplate(sessionItems);
-            sessionMenu.popup();
-          });
-        },
+        label: 'Pick session (interactive)',
+        click: () => launchInPowerShell('resume-pick'),
       },
-      { type: 'separator' },
-      {
+    ];
+
+    // Add recent sessions from disk
+    if (allSessions.length > 0) {
+      menuItems.push({ type: 'separator' });
+      menuItems.push({ label: `Recent sessions (${allSessions.length} total)`, enabled: false });
+
+      // Show up to 12 most recent sessions
+      for (const session of allSessions.slice(0, 12)) {
+        const timeAgo = getTimeAgo(session.modifiedAt);
+        const shortId = session.id.slice(0, 8);
+        const projectLabel = session.projectDir.split('/').pop() || session.projectDir;
+        menuItems.push({
+          label: `${projectLabel} — ${shortId}... (${session.sizeKB}KB, ${timeAgo})`,
+          click: () => launchInPowerShell('resume', session.id),
+        });
+      }
+    }
+
+    menuItems.push({ type: 'separator' });
+    menuItems.push({
         label: 'Change animation...',
         click: () => {
           dialog.showOpenDialog({
@@ -420,8 +416,7 @@ app.whenReady().then(() => {
             }
           });
         },
-      },
-    ];
+    });
 
     const menu = Menu.buildFromTemplate(menuItems);
     menu.popup();
