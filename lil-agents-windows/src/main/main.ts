@@ -16,6 +16,10 @@ import { getSelectedMonitor } from './monitor';
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disable-gpu-disk-cache');
 
+// Disable GPU acceleration for reliable window rendering on Windows.
+// transparent: true silently breaks rendering with GPU compositing.
+app.commandLine.appendSwitch('disable-gpu');
+
 function configureDevStoragePaths(): void {
   if (app.isPackaged) return;
 
@@ -37,10 +41,16 @@ function configureDevStoragePaths(): void {
 
 configureDevStoragePaths();
 
+// Prevent Electron from quitting when no visible windows exist (tray app)
+app.on('window-all-closed', () => {
+  // Do nothing — app stays alive via tray
+});
+
 // Single instance lock
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
-  app.quit();
+  console.log('[main] Another instance is already running; exiting this instance.');
+  app.exit(0);
 }
 
 // State
@@ -186,31 +196,35 @@ app.whenReady().then(() => {
   // Create overlay window
   createOverlayWindow();
 
-  // Create system tray
-  createTray({
-    onProviderChange: (name, provider) => {
-      destroySession(name);
-      walkerEngine.setCharacterProvider(name, provider);
-    },
-    onSizeChange: (name, size) => {
-      walkerEngine.setCharacterSize(name, size);
-    },
-    onVisibilityChange: (name, visible) => {
-      walkerEngine.setCharacterVisible(name, visible);
-      if (!visible) destroySession(name);
-    },
-    onSoundToggle: (_enabled) => {},
-    onMonitorChange: (_monitorId) => {
-      const newMonitor = getSelectedMonitor();
-      walkerEngine.updateScreenWidth(newMonitor.bounds.width);
-      repositionOverlay();
-    },
-    onRefreshAll: () => {
-      for (const name of ['bruce', 'jazz'] as CharacterName[]) {
+  // Create system tray (can be disabled in dev for diagnostics)
+  if (process.env.LIL_AGENTS_NO_TRAY === '1') {
+    console.warn('[main] Tray disabled via LIL_AGENTS_NO_TRAY=1');
+  } else {
+    createTray({
+      onProviderChange: (name, provider) => {
         destroySession(name);
-      }
-    },
-  });
+        walkerEngine.setCharacterProvider(name, provider);
+      },
+      onSizeChange: (name, size) => {
+        walkerEngine.setCharacterSize(name, size);
+      },
+      onVisibilityChange: (name, visible) => {
+        walkerEngine.setCharacterVisible(name, visible);
+        if (!visible) destroySession(name);
+      },
+      onSoundToggle: (_enabled) => {},
+      onMonitorChange: (_monitorId) => {
+        const newMonitor = getSelectedMonitor();
+        walkerEngine.updateScreenWidth(newMonitor.bounds.width);
+        repositionOverlay();
+      },
+      onRefreshAll: () => {
+        for (const name of ['bruce', 'jazz'] as CharacterName[]) {
+          destroySession(name);
+        }
+      },
+    });
+  }
 
   // Animation loop (60fps)
   const FPS = 60;
@@ -322,13 +336,12 @@ app.whenReady().then(() => {
   screen.on('display-added', () => repositionOverlay());
   screen.on('display-removed', () => repositionOverlay());
   screen.on('display-metrics-changed', () => repositionOverlay());
-});
 
-app.on('window-all-closed', () => {
-  // Keep running in tray — do nothing
+  console.log('[main] App fully initialized. Tray + overlay + animation running.');
 });
 
 app.on('before-quit', () => {
+  console.log('[main] App quitting...');
   if (animationTimer) clearInterval(animationTimer);
   for (const name of ['bruce', 'jazz'] as CharacterName[]) {
     destroySession(name);

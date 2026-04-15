@@ -181,13 +181,33 @@ function loadSprites(name, frameCount) {
 }
 
 // Init
+console.log('[overlay.js] Initializing...');
+console.log('[overlay.js] window.lilAgents:', typeof window.lilAgents);
+console.log('[overlay.js] canvas:', canvas ? canvas.width + 'x' + canvas.height : 'null');
+
 resizeCanvas();
+console.log('[overlay.js] Canvas resized to:', canvas.width, 'x', canvas.height);
 window.addEventListener('resize', resizeCanvas);
-loadSprites('bruce', 300);
-loadSprites('jazz', 300);
 
-window.lilAgents.onUpdateCharacters((states) => { characterStates = states; });
-window.lilAgents.onThemeChanged((dark) => { isDarkTheme = dark; });
+// Skip sprite loading for now — we'll use placeholders
+// loadSprites('bruce', 300);
+// loadSprites('jazz', 300);
 
-requestAnimationFrame(render);
-window.lilAgents.reportReady();
+if (window.lilAgents) {
+  window.lilAgents.onUpdateCharacters((states) => {
+    characterStates = states;
+    if (states.length > 0 && !window._loggedFirstUpdate) {
+      console.log('[overlay.js] First character update:', JSON.stringify(states[0]));
+      window._loggedFirstUpdate = true;
+    }
+  });
+  window.lilAgents.onThemeChanged((dark) => { isDarkTheme = dark; });
+
+  requestAnimationFrame(render);
+  window.lilAgents.reportReady();
+  console.log('[overlay.js] Ready, render loop started');
+} else {
+  console.error('[overlay.js] window.lilAgents is undefined! Preload failed.');
+  // Still start the render loop for debugging
+  requestAnimationFrame(render);
+}

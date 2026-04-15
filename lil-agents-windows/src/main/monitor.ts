@@ -32,7 +32,14 @@ export function getSelectedMonitor(): MonitorInfo {
 
 export function getOverlayBounds(monitor: MonitorInfo): { x: number; y: number; width: number; height: number } {
   const overlayHeight = 250;
-  const taskbarHeight = monitor.bounds.height - monitor.workArea.height - (monitor.workArea.y - monitor.bounds.y);
+  let taskbarHeight = monitor.bounds.height - monitor.workArea.height - (monitor.workArea.y - monitor.bounds.y);
+  // On Windows with display scaling, workArea can equal bounds (taskbar height = 0).
+  // Fall back to a sensible default so overlay sits above the taskbar.
+  if (taskbarHeight <= 0) {
+    taskbarHeight = 48; // typical Windows 11 taskbar
+    console.log('[monitor] taskbarHeight was <= 0, defaulting to', taskbarHeight);
+  }
+  console.log('[monitor] overlay calc: taskbarHeight=%d overlayHeight=%d', taskbarHeight, overlayHeight);
   return {
     x: monitor.bounds.x,
     y: monitor.bounds.y + monitor.bounds.height - overlayHeight - taskbarHeight,

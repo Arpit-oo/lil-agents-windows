@@ -1,4 +1,5 @@
 import { Tray, Menu, nativeImage, nativeTheme, app } from 'electron';
+import * as fs from 'fs';
 import * as path from 'path';
 import { getSettings } from './settings';
 import { getAllMonitors } from './monitor';
@@ -15,14 +16,39 @@ type TrayCallbacks = {
 
 let tray: Tray | null = null;
 
+function createFallbackIcon(): Electron.NativeImage {
+  // 16x16 solid green PNG encoded as base64 (valid PNG bytes)
+  const pngBase64 =
+    'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGElEQVR4nGNkOMHAQIxg1YxV' +
+    'M1TNAAAEKgAacw6P8QAAAABJRU5ErkJggg==';
+  return nativeImage.createFromDataURL(`data:image/png;base64,${pngBase64}`);
+}
+
+function resolveTrayIconPath(): string | null {
+  const candidates = [
+    path.join(__dirname, '..', '..', 'assets', 'icons', 'tray-icon.png'),
+    path.join(__dirname, '..', '..', '..', 'assets', 'icons', 'tray-icon.png'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 export function createTray(callbacks: TrayCallbacks): Tray {
-  const iconPath = path.join(__dirname, '..', '..', 'assets', 'icons', 'tray-icon.png');
   let icon: Electron.NativeImage;
   try {
-    icon = nativeImage.createFromPath(iconPath);
-    icon = icon.resize({ width: 16, height: 16 });
+    const iconPath = resolveTrayIconPath();
+    icon = iconPath ? nativeImage.createFromPath(iconPath) : nativeImage.createEmpty();
+    if (icon.isEmpty()) {
+      console.warn('[tray] Icon file loaded but is empty, using fallback');
+      icon = createFallbackIcon();
+    } else {
+      icon = icon.resize({ width: 16, height: 16 });
+    }
   } catch {
-    icon = nativeImage.createEmpty();
+    console.warn('[tray] Failed to load icon, using fallback');
+    icon = createFallbackIcon();
   }
 
   tray = new Tray(icon);

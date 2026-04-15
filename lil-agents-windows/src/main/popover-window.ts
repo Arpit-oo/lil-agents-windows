@@ -37,6 +37,7 @@ export function showPopover(characterName: CharacterName, x: number, y: number, 
       preload: path.join(__dirname, '..', 'preload', 'popover-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false, // allow preload to require('../shared/ipc-channels')
     },
   });
 
