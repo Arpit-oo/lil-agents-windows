@@ -21,4 +21,7 @@ contextBridge.exposeInMainWorld('lilAgents', {
   setClickThrough: (ignore: boolean, forward: boolean) => {
     ipcRenderer.send(IPC.SET_CLICK_THROUGH, ignore, forward);
   },
+  onAnimationChanged: (callback: (name: string, filePath: string) => void) => {
+    ipcRenderer.on('character:animation-changed', (_event, name, filePath) => callback(name, filePath));
+  },
 });

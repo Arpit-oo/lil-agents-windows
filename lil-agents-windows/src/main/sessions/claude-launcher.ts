@@ -1,4 +1,4 @@
-import { execSync, spawn } from 'child_process';
+import { exec, spawn } from 'child_process';
 import { findBinary } from '../shell-environment';
 
 export interface ClaudeSession {
@@ -8,54 +8,51 @@ export interface ClaudeSession {
 }
 
 /**
- * List active Claude Code sessions by running `claude sessions list`
+ * List active Claude Code sessions (non-blocking)
  */
-export async function listClaudeSessions(): Promise<ClaudeSession[]> {
-  const binaryPath = await findBinary('claude');
-  if (!binaryPath) return [];
+export function listClaudeSessions(): Promise<ClaudeSession[]> {
+  return new Promise(async (resolve) => {
+    const binaryPath = await findBinary('claude');
+    if (!binaryPath) { resolve([]); return; }
 
-  try {
-    const output = execSync(
+    // Use exec (async) instead of execSync to avoid blocking the main process
+    const child = exec(
       `powershell -NoProfile -Command "& '${binaryPath}' sessions list"`,
-      { encoding: 'utf8', timeout: 10000 }
+      { encoding: 'utf8', timeout: 5000 },
+      (err, stdout) => {
+        if (err) {
+          console.warn('[claude-launcher] Failed to list sessions:', err.message);
+          resolve([]);
+          return;
+        }
+
+        const lines = stdout.trim().split('\n').filter(l => l.trim());
+        if (lines.length <= 1) { resolve([]); return; }
+
+        const sessions: ClaudeSession[] = [];
+        for (let i = 1; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (!line || line.startsWith('-') || line.startsWith('=')) continue;
+
+          const parts = line.split(/\s{2,}/);
+          if (parts.length >= 1) {
+            sessions.push({
+              id: parts[0]?.trim() || '',
+              name: parts[1]?.trim() || parts[0]?.trim() || 'Unknown',
+              lastActive: parts[2]?.trim() || '',
+            });
+          }
+        }
+        resolve(sessions);
+      }
     );
 
-    // Parse the output — claude sessions list outputs a table like:
-    // Session ID    Name    Last Active
-    // abc123        ...     2024-01-01
-    const lines = output.trim().split('\n').filter(l => l.trim());
-    if (lines.length <= 1) return []; // Header only or empty
-
-    const sessions: ClaudeSession[] = [];
-    // Skip header line(s) — look for lines that start with session-like IDs
-    for (let i = 1; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line || line.startsWith('-') || line.startsWith('=')) continue;
-
-      // Try to parse space-separated columns
-      const parts = line.split(/\s{2,}/); // Split on 2+ spaces
-      if (parts.length >= 1) {
-        sessions.push({
-          id: parts[0]?.trim() || '',
-          name: parts[1]?.trim() || parts[0]?.trim() || 'Unknown',
-          lastActive: parts[2]?.trim() || '',
-        });
-      }
-    }
-    return sessions;
-  } catch (err) {
-    console.warn('[claude-launcher] Failed to list sessions:', err);
-    return [];
-  }
-}
-
-/**
- * Get the most recent session ID
- */
-export async function getLastSessionId(): Promise<string | null> {
-  const sessions = await listClaudeSessions();
-  if (sessions.length === 0) return null;
-  return sessions[0].id;
+    // Safety: kill if it takes too long
+    setTimeout(() => {
+      try { child.kill(); } catch {}
+      resolve([]);
+    }, 5000);
+  });
 }
 
 /**
@@ -68,16 +65,11 @@ export async function launchInPowerShell(sessionId?: string): Promise<void> {
     return;
   }
 
-  const args = sessionId
+  const claudeCmd = sessionId
     ? `& '${binaryPath}' --resume '${sessionId}'`
     : `& '${binaryPath}'`;
 
-  // Open a new PowerShell window with Claude running inside
-  spawn('powershell', [
-    '-NoExit',
-    '-Command',
-    args,
-  ], {
+  spawn('powershell', ['-NoExit', '-Command', claudeCmd], {
     detached: true,
     stdio: 'ignore',
     windowsHide: false,
@@ -85,15 +77,10 @@ export async function launchInPowerShell(sessionId?: string): Promise<void> {
 }
 
 /**
- * Launch Claude Code in an embedded terminal (returns the command + args for xterm.js PTY)
+ * Returns command info for future xterm.js PTY integration
  */
 export async function getClaudeLaunchCommand(sessionId?: string): Promise<{ cmd: string; args: string[] } | null> {
   const binaryPath = await findBinary('claude');
   if (!binaryPath) return null;
-
-  const args = sessionId
-    ? ['--resume', sessionId]
-    : [];
-
-  return { cmd: binaryPath, args };
+  return { cmd: binaryPath, args: sessionId ? ['--resume', sessionId] : [] };
 }

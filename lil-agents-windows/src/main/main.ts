@@ -1,4 +1,4 @@
-import { app, ipcMain, Menu, nativeTheme, screen } from 'electron';
+import { app, dialog, ipcMain, Menu, nativeTheme, screen } from 'electron';
 import * as fs from 'fs';
 import * as path from 'path';
 import { IPC } from '../shared/ipc-channels';
@@ -350,73 +350,78 @@ app.whenReady().then(() => {
     }
   });
 
-  // IPC: Character right-clicked — show session context menu
-  ipcMain.on('character:right-clicked', async (_event, name: CharacterName, screenX: number, screenY: number) => {
-    const { listClaudeSessions, launchInPowerShell } = await import('./sessions/claude-launcher');
+  // IPC: Character right-clicked — show session context menu instantly
+  ipcMain.on('character:right-clicked', (_event, name: CharacterName, _screenX: number, _screenY: number) => {
+    const { launchInPowerShell, listClaudeSessions } = require('./sessions/claude-launcher');
 
-    // Fetch sessions in background
-    const claudeSessions = await listClaudeSessions();
-    const lastSessionId = claudeSessions.length > 0 ? claudeSessions[0].id : null;
-
-    const menuItems: Electron.MenuItemConstructorOptions[] = [];
-
-    // New session
-    menuItems.push({
-      label: 'New session',
-      submenu: [
-        {
-          label: 'In mini-terminal',
-          click: () => openMiniTerminal(name),
-        },
-        {
-          label: 'In PowerShell',
-          click: () => launchInPowerShell(),
-        },
-      ],
-    });
-
-    // Resume last
-    if (lastSessionId) {
-      menuItems.push({
+    const menuItems: Electron.MenuItemConstructorOptions[] = [
+      {
+        label: 'New Claude session',
+        click: () => launchInPowerShell(),
+      },
+      {
         label: 'Resume last session',
-        submenu: [
-          {
-            label: 'In mini-terminal',
-            click: () => openMiniTerminal(name, lastSessionId),
-          },
-          {
-            label: 'In PowerShell',
-            click: () => launchInPowerShell(lastSessionId),
-          },
-        ],
-      });
-    }
-
-    // Active sessions list
-    if (claudeSessions.length > 0) {
-      menuItems.push({ type: 'separator' });
-      menuItems.push({ label: 'Active Sessions', enabled: false });
-
-      for (const session of claudeSessions.slice(0, 10)) { // Limit to 10
-        const label = session.name || session.id.slice(0, 12);
-        menuItems.push({
-          label: `  ${label}`,
-          submenu: [
-            {
-              label: 'In mini-terminal',
-              click: () => openMiniTerminal(name, session.id),
-            },
-            {
-              label: 'In PowerShell',
-              click: () => launchInPowerShell(session.id),
-            },
-          ],
-        });
-      }
-    } else {
-      menuItems.push({ type: 'separator' });
-      menuItems.push({ label: 'No active sessions', enabled: false });
-    }
+        click: () => {
+          listClaudeSessions().then((sessions: any[]) => {
+            if (sessions.length > 0) {
+              launchInPowerShell(sessions[0].id);
+            } else {
+              launchInPowerShell(); // No sessions, start fresh
+            }
+          });
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Browse sessions...',
+        click: () => {
+          // Fetch sessions async, then show a submenu
+          listClaudeSessions().then((sessions: any[]) => {
+            if (sessions.length === 0) {
+              const noSessionsMenu = Menu.buildFromTemplate([
+                { label: 'No active sessions found', enabled: false },
+                { type: 'separator' },
+                { label: 'Start new session', click: () => launchInPowerShell() },
+              ]);
+              noSessionsMenu.popup();
+              return;
+            }
+            const sessionItems: Electron.MenuItemConstructorOptions[] = sessions.slice(0, 15).map((s: any) => ({
+              label: s.name || s.id.slice(0, 16),
+              click: () => launchInPowerShell(s.id),
+            }));
+            const sessionMenu = Menu.buildFromTemplate(sessionItems);
+            sessionMenu.popup();
+          });
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Change animation...',
+        click: () => {
+          dialog.showOpenDialog({
+            title: `Choose animation for ${name === 'bruce' ? 'Bruce' : 'Jazz'}`,
+            filters: [
+              { name: 'Images', extensions: ['gif', 'png', 'webp', 'apng'] },
+            ],
+            properties: ['openFile'],
+          }).then(result => {
+            if (!result.canceled && result.filePaths.length > 0) {
+              const filePath = result.filePaths[0];
+              // Store custom animation path in settings
+              const settings = getSettings();
+              settings.set(`characters.${name}.customAnimation` as any, filePath);
+              // Notify overlay to reload
+              const overlay = getOverlayWindow();
+              if (overlay && !overlay.isDestroyed()) {
+                overlay.webContents.send('character:animation-changed', name, filePath);
+              }
+              console.log(`[main] Custom animation set for ${name}: ${filePath}`);
+            }
+          });
+        },
+      },
+    ];
 
     const menu = Menu.buildFromTemplate(menuItems);
     menu.popup();

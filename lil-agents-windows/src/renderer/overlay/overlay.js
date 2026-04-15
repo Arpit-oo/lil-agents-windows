@@ -21,6 +21,11 @@ function resizeCanvas() {
 }
 
 function drawCharacter(state) {
+  // Check for custom GIF animation first
+  if (customAnimations.has(state.name) && drawCustomAnimation(state)) {
+    return; // Custom animation handled it
+  }
+
   const sprite = sprites.get(state.name);
   const canvasH = canvas.height / window.devicePixelRatio;
   const bottomY = canvasH - 10;
@@ -251,11 +256,50 @@ window.addEventListener('resize', resizeCanvas);
 loadSprites('bruce', 301);
 loadSprites('jazz', 301);
 
+// Custom GIF animations — stored per character
+let customAnimations = new Map(); // name -> { img: HTMLImageElement, loaded: boolean }
+
+function drawCustomAnimation(state) {
+  const custom = customAnimations.get(state.name);
+  if (!custom || !custom.loaded) return false;
+
+  const canvasH = canvas.height / window.devicePixelRatio;
+  const bottomY = canvasH - 10;
+  const yPos = bottomY - state.height;
+
+  ctx.save();
+  if (state.flipped) {
+    ctx.translate(state.x, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(custom.img, -state.width / 2, yPos, state.width, state.height);
+  } else {
+    ctx.drawImage(custom.img, state.x - state.width / 2, yPos, state.width, state.height);
+  }
+  ctx.restore();
+  return true;
+}
+
 if (window.lilAgents) {
   window.lilAgents.onUpdateCharacters((states) => {
     characterStates = states;
   });
   window.lilAgents.onThemeChanged((dark) => { isDarkTheme = dark; });
+
+  // Listen for custom animation changes
+  window.lilAgents.onAnimationChanged((name, filePath) => {
+    console.log('[overlay.js] Loading custom animation for', name, ':', filePath);
+    const img = new Image();
+    img.onload = () => {
+      customAnimations.set(name, { img, loaded: true });
+      console.log('[overlay.js] Custom animation loaded for', name);
+    };
+    img.onerror = () => {
+      console.error('[overlay.js] Failed to load custom animation:', filePath);
+    };
+    // Use file:// protocol for local files
+    img.src = 'file:///' + filePath.replace(/\\/g, '/');
+  });
+
   requestAnimationFrame(render);
   window.lilAgents.reportReady();
 } else {
