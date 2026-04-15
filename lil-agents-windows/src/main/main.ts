@@ -12,13 +12,20 @@ import { createSession, AgentSession, AgentSessionCallbacks } from './sessions/i
 import { createTray, destroyTray } from './tray';
 import { getSelectedMonitor } from './monitor';
 
+// Fix Windows GPU cache "Access is denied" errors
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disable-gpu-disk-cache');
+
 function configureDevStoragePaths(): void {
   if (app.isPackaged) return;
 
   const profileRoot = path.join(app.getPath('temp'), 'lil-agents-windows-dev-profile');
-  const sessionDir = path.join(profileRoot, 'session');
-  const cacheDir = path.join(profileRoot, 'cache');
 
+  // Wipe stale cache to avoid lock conflicts from previous runs
+  const cacheDir = path.join(profileRoot, 'cache');
+  try { fs.rmSync(cacheDir, { recursive: true, force: true }); } catch {}
+
+  const sessionDir = path.join(profileRoot, 'session');
   fs.mkdirSync(sessionDir, { recursive: true });
   fs.mkdirSync(cacheDir, { recursive: true });
 
