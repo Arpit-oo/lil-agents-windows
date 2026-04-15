@@ -1,10 +1,17 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import { IPC } from '../shared/ipc-channels';
 import { CharacterState } from '../shared/types';
 import { getSelectedMonitor, getOverlayBounds } from './monitor';
 
 let overlayWindow: BrowserWindow | null = null;
+
+function resolveOverlayHtmlPath(): string {
+  const distPath = path.join(__dirname, '..', 'renderer', 'overlay', 'index.html');
+  if (fs.existsSync(distPath)) return distPath;
+  return path.join(__dirname, '..', '..', 'src', 'renderer', 'overlay', 'index.html');
+}
 
 export function createOverlayWindow(): BrowserWindow {
   const monitor = getSelectedMonitor();
@@ -30,7 +37,7 @@ export function createOverlayWindow(): BrowserWindow {
   });
 
   overlayWindow.setIgnoreMouseEvents(true, { forward: true });
-  overlayWindow.loadFile(path.join(__dirname, '..', 'renderer', 'overlay', 'index.html'));
+  overlayWindow.loadFile(resolveOverlayHtmlPath());
 
   ipcMain.on(IPC.SET_CLICK_THROUGH, (_event, ignore: boolean, forward: boolean) => {
     overlayWindow?.setIgnoreMouseEvents(ignore, { forward });

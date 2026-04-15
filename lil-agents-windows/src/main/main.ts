@@ -1,4 +1,6 @@
 import { app, ipcMain, nativeTheme, screen } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 import { IPC } from '../shared/ipc-channels';
 import { CharacterName, ProviderName, CharacterSize } from '../shared/types';
 import { initSettings, getSettings } from './settings';
@@ -9,6 +11,24 @@ import { showPopover, sendToPopover, closeAllPopovers, getPopoverWindow } from '
 import { createSession, AgentSession, AgentSessionCallbacks } from './sessions/index';
 import { createTray, destroyTray } from './tray';
 import { getSelectedMonitor } from './monitor';
+
+function configureDevStoragePaths(): void {
+  if (app.isPackaged) return;
+
+  const profileRoot = path.join(app.getPath('temp'), 'lil-agents-windows-dev-profile');
+  const sessionDir = path.join(profileRoot, 'session');
+  const cacheDir = path.join(profileRoot, 'cache');
+
+  fs.mkdirSync(sessionDir, { recursive: true });
+  fs.mkdirSync(cacheDir, { recursive: true });
+
+  app.setPath('userData', profileRoot);
+  app.setPath('sessionData', sessionDir);
+  app.setPath('cache', cacheDir);
+  app.commandLine.appendSwitch('disk-cache-dir', cacheDir);
+}
+
+configureDevStoragePaths();
 
 // Single instance lock
 const gotLock = app.requestSingleInstanceLock();

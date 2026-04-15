@@ -1,9 +1,16 @@
 import { BrowserWindow, ipcMain, nativeTheme } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 import { IPC } from '../shared/ipc-channels';
 import { CharacterName, ProviderName } from '../shared/types';
 
 const popoverWindows: Map<CharacterName, BrowserWindow> = new Map();
+
+function resolvePopoverHtmlPath(): string {
+  const distPath = path.join(__dirname, '..', 'renderer', 'popover', 'index.html');
+  if (fs.existsSync(distPath)) return distPath;
+  return path.join(__dirname, '..', '..', 'src', 'renderer', 'popover', 'index.html');
+}
 
 export function showPopover(characterName: CharacterName, x: number, y: number, provider: ProviderName): BrowserWindow {
   let win = popoverWindows.get(characterName);
@@ -33,7 +40,7 @@ export function showPopover(characterName: CharacterName, x: number, y: number, 
     },
   });
 
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'popover', 'index.html'));
+  win.loadFile(resolvePopoverHtmlPath());
   win.once('ready-to-show', () => {
     win!.show();
     win!.webContents.send(IPC.THEME_CHANGED, nativeTheme.shouldUseDarkColors);
