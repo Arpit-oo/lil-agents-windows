@@ -316,10 +316,21 @@ if (window.lilAgents) {
   window.lilAgents.onAnimationReset((name) => {
     console.log('[overlay.js] Resetting animation for', name);
     const old = customAnimations.get(name);
-    if (old && old.el && old.el.parentNode) {
-      old.el.parentNode.removeChild(old.el);
+    if (old) {
+      // Mark inactive immediately so drawCharacter and updateGifPositions skip it
+      old.active = false;
+      if (old.el) {
+        old.el.style.display = 'none';
+        old.el.src = ''; // Stop GIF animation
+        if (old.el.parentNode) {
+          old.el.parentNode.removeChild(old.el);
+        }
+      }
     }
     customAnimations.delete(name);
+    // Reset local animation state so sprite starts fresh
+    localAnimState.delete(name);
+    console.log('[overlay.js] Animation reset complete for', name, '— customAnimations size:', customAnimations.size);
   });
 
   requestAnimationFrame(render);
