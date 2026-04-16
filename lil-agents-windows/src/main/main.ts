@@ -238,7 +238,7 @@ app.whenReady().then(() => {
           console.log(`[main] Restored custom animation for ${char.name}: ${customAnim}`);
         } else {
           // File no longer exists, clear the setting
-          settings.set(`characters.${char.name}.customAnimation` as any, undefined);
+          (settings as any).delete(`characters.${char.name}.customAnimation`);
         }
       }
     }
@@ -483,7 +483,7 @@ app.whenReady().then(() => {
       menuItems.push({
         label: 'Reset to original animation',
         click: () => {
-          getSettings().set(`characters.${name}.customAnimation` as any, undefined);
+          (getSettings() as any).delete(`characters.${name}.customAnimation`);
           const overlay = getOverlayWindow();
           if (overlay && !overlay.isDestroyed()) {
             overlay.webContents.send('character:animation-reset', name);
@@ -514,7 +514,7 @@ app.whenReady().then(() => {
     if (currentChime) {
       menuItems.push({
         label: 'Reset to default sounds',
-        click: () => getSettings().set('customChime' as any, undefined),
+        click: () => (getSettings() as any).delete('customChime'),
       });
     }
 
